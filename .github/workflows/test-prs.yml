@@ -1,0 +1,51 @@
+name: Test Pull Request
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    container:
+      image: node:latest
+
+    steps:
+
+      # Setup:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Restore node_modules cache
+        id: cache-deps
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-dependencies-${{ hashFiles('**/package-lock.json') }}
+
+      # Install dependencies & make assets:
+      - name: Install dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: npm install
+
+      # Build:
+      - name: Build dist/
+        run: npm build
+
+      # Ensure that the dist/ folder has not changed
+      # (if it has changed, the PR author forgot to run `npm build` before pushing)
+      - name: Check for changes in dist folder
+        run: |
+          git diff --exit-code dist/
+
+      # Unit tests:
+      - name: Run unit tests
+        run: npm test
+
+      # Save cache
+      - name: Save node_modules cache
+        uses: actions/cache/save@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-dependencies-${{ hashFiles('**/package-lock.json') }}
